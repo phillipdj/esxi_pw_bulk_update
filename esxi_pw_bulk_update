@@ -1,0 +1,74 @@
+import paramiko
+import pandas as pd
+
+def change_esxi_password(host, port, username, current_password, new_password):
+    """
+    Change the ESXi password for a given host using SSH.
+    
+    :param host: IP address or hostname of the ESXi host
+    :param port: Port number for SSH (default is 22)
+    :param username: Current username
+    :param current_password: Current password
+    :param new_password: New password to set
+    """
+    # Create an SSH client
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+        # Connect to the ESXi host
+        ssh.connect(host, port, username, current_password)
+
+        # Command to change the password
+        change_password_command = f'echo "{username}:{new_password}" | passwd'
+
+        # Execute the command
+        stdin, stdout, stderr = ssh.exec_command(change_password_command)
+
+        # Capture any output or error messages
+        output = stdout.read().decode()
+        error = stderr.read().decode()
+
+        if error:
+            print(f"Error: {error}")
+        else:
+            print(f"Password changed successfully for {host}.")
+    except paramiko.AuthenticationException:
+        print(f"Authentication failed for {host}, please verify your credentials.")
+    except paramiko.SSHException as sshException:
+        print(f"Unable to establish SSH connection to {host}: {sshException}")
+    except Exception as e:
+        print(f"Exception in connecting to {host}: {e}")
+    finally:
+        # Close the SSH connection
+        ssh.close()
+
+def get_ip_addresses_from_excel(file_name, sheet_name, column_name):
+    """
+    Get IP addresses from an Excel file.
+    
+    :param file_name: Name of the Excel file
+    :param sheet_name: Name of the sheet in the Excel file
+    :param column_name: Name of the column containing IP addresses
+    :return: List of IP addresses
+    """
+    df = pd.read_excel(file_name, sheet_name=sheet_name)
+    return df[column_name].dropna().tolist()
+
+if __name__ == "__main__":
+    # Define new password and credentials
+    new_password = 'New password here'
+    current_password = 'Current password here'
+    username = 'root'
+    port = 22  # Default SSH port
+
+    # Get IP addresses from the Excel file
+    file_name = 'esxi_pw_bulk_update_ip_addresses.xlsx'  # Name of your Excel file
+    sheet_name = 'IP Addresses'  # Name of the sheet in the Excel file
+    column_name = 'IP'  # Name of the column containing IP addresses
+
+    esxi_ips = get_ip_addresses_from_excel(file_name, sheet_name, column_name)
+
+    # Loop through each ESXi IP and change the password
+    for ip in esxi_ips:
+        change_esxi_password(ip, port, username, current_password, new_password)
